@@ -21,6 +21,8 @@ jobs:
       - name: Clone kernel
         run: |
           git clone --depth=1 https://github.com/msm8916-mainline/linux.git kernel
+          cp kiwi_defconfig kernel/arch/arm64/configs/kiwi_defconfig
+
 
       - name: Build kernel
         run: |
@@ -28,7 +30,7 @@ jobs:
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
 
-          make msm8916_defconfig
+          make kiwi_defconfig
           make -j$(nproc) Image.gz dtbs
 
       - name: Upload kernel
