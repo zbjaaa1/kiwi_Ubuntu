@@ -1,0 +1,40 @@
+name: Kiwi Kernel Build
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git bc bison flex libssl-dev make \
+            gcc-aarch64-linux-gnu libncurses-dev
+
+      - name: Clone kernel
+        run: |
+          git clone --depth=1 https://github.com/msm8916-mainline/linux.git kernel
+
+      - name: Build kernel
+        run: |
+          cd kernel
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+
+          make msm8916_defconfig
+          make -j$(nproc) Image.gz dtbs
+
+      - name: Upload kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiwi-kernel
+          path: |
+            kernel/arch/arm64/boot/Image.gz
+            kernel/arch/arm64/boot/dts/qcom/
