@@ -85,15 +85,15 @@ jobs:
           cp -a rootfs/* initramfs/
 
           cat > initramfs/init << 'EOF'
-#!/bin/sh
-mount -t proc proc /proc
-mount -t sysfs sys /sys
-mount -t devtmpfs dev /dev
+          #!/bin/sh
+          mount -t proc proc /proc
+          mount -t sysfs sys /sys
+          mount -t devtmpfs dev /dev
 
-echo "[Kiwi Phosh CI] Booting Ubuntu + Phosh"
+          echo "[Kiwi Phosh CI] Booting Ubuntu + Phosh"
 
-exec /sbin/init
-EOF
+          exec /sbin/init
+          EOF
 
           chmod +x initramfs/init
 
