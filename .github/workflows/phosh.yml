@@ -25,7 +25,7 @@ jobs:
       # =========================
       - name: Clone kernel
         run: |
-          git clone --depth=1 https://gitlab.com/postmarketOS/linux-postmarketos.git kernel
+          git clone --depth=1 https://github.com/msm8916-mainline/linux.git kernel
 
       - name: Build kernel
         run: |
