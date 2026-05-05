@@ -16,7 +16,7 @@ jobs:
             git build-essential bc bison flex libssl-dev \
             gcc-aarch64-linux-gnu \
             debootstrap \
-            android-tools-mkbootimg \
+            android-sdk-libsparse-utils \
             cpio wget \
             qemu-user-static
 
