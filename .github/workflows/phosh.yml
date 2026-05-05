@@ -36,7 +36,7 @@ jobs:
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
 
-          make msm8916_defconfig
+          make kiwi_defconfig
           make -j$(nproc)
 
       # =========================
