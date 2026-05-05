@@ -1,0 +1,141 @@
+name: Ubuntu Phosh Kiwi CI
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install deps
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git build-essential bc bison flex libssl-dev \
+            gcc-aarch64-linux-gnu \
+            debootstrap \
+            android-tools-mkbootimg \
+            cpio wget \
+            qemu-user-static
+
+      # =========================
+      # 1. Kernel
+      # =========================
+      - name: Clone kernel
+        run: |
+          git clone --depth=1 https://gitlab.com/postmarketOS/linux-postmarketos.git kernel
+
+      - name: Build kernel
+        run: |
+          cd kernel
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+
+          make kiwi_defconfig || make defconfig
+          make -j$(nproc)
+
+      # =========================
+      # 2. DTB merge
+      # =========================
+      - name: Prepare kernel image
+        run: |
+          cd kernel
+
+          cat arch/arm64/boot/Image.gz \
+              arch/arm64/boot/dts/qcom/msm8939-huawei-kiwi.dtb \
+              > Image.gz-dtb
+
+      # =========================
+      # 3. Ubuntu rootfs
+      # =========================
+      - name: Build Ubuntu rootfs
+        run: |
+          sudo debootstrap --arch=arm64 jammy rootfs http://ports.ubuntu.com/
+
+          sudo mount -t proc proc rootfs/proc
+          sudo mount -t sysfs sys rootfs/sys
+          sudo mount -o bind /dev rootfs/dev
+
+          sudo chroot rootfs /bin/bash -c "
+            apt update || true
+            apt install -y systemd dbus network-manager sudo || true
+          "
+
+      # =========================
+      # 4. Install Phosh UI
+      # =========================
+      - name: Install Phosh
+        run: |
+          sudo chroot rootfs /bin/bash -c "
+            apt install -y phosh phoc gdm3 gnome-terminal \
+            mesa-utils libgl1-mesa-dri xwayland || true
+          "
+
+          # enable graphical boot
+          sudo chroot rootfs systemctl set-default graphical.target
+
+      # =========================
+      # 5. Initramfs (fallback boot)
+      # =========================
+      - name: Build initramfs
+        run: |
+          mkdir -p initramfs
+          cp -a rootfs/* initramfs/
+
+          cat > initramfs/init << 'EOF'
+#!/bin/sh
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev
+
+echo "[Kiwi Phosh CI] Booting Ubuntu + Phosh"
+
+exec /sbin/init
+EOF
+
+          chmod +x initramfs/init
+
+          cd initramfs
+          find . | cpio -o -H newc | gzip > ../initrd.img
+
+      # =========================
+      # 6. Boot.img
+      # =========================
+      - name: Create boot.img
+        run: |
+          mkbootimg \
+            --kernel kernel/Image.gz-dtb \
+            --ramdisk initrd.img \
+            --base 0x80000000 \
+            --kernel_offset 0x00080000 \
+            --ramdisk_offset 0x02000000 \
+            --tags_offset 0x01e00000 \
+            --pagesize 2048 \
+            --cmdline "console=ttyMSM0,115200 earlycon root=/dev/mmcblk0p21p2 rw rootwait" \
+            -o boot.img
+
+      # =========================
+      # 7. rootfs image
+      # =========================
+      - name: Build rootfs image
+        run: |
+          dd if=/dev/zero of=rootfs.img bs=1M count=4096
+          mkfs.ext4 rootfs.img
+
+          mkdir mnt
+          sudo mount rootfs.img mnt
+          sudo cp -a rootfs/* mnt/
+          sudo umount mnt
+
+      # =========================
+      # 8. upload artifacts
+      # =========================
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiwi-phosh-ubuntu
+          path: |
+            boot.img
+            rootfs.img
